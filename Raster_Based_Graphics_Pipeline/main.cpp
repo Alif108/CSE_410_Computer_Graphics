@@ -1,25 +1,21 @@
 #include <fstream>
 #include <string>
 #include <stack>
-#include "structures.h"
+#include "z_buffer.h"
 
 using namespace std;
 
-point pos;           /// position of the camera
-point u;             /// up direction
-point r;             /// right direction
-point l;             /// look direction
-
-
-string input_filepath = "E:\\4-1\\CSE_410 Computer Graphics Sessional\\Offline_2\\Resources\\Test Cases\\4\\scene.txt";
-string output_filepath = "E:\\4-1\\CSE_410 Computer Graphics Sessional\\Offline_2\\Resources\\Code\\Raster_Based_Graphics_Pipeline\\Output\\";
+Point pos;           /// position of the camera
+Point u;             /// up direction
+Point r;             /// right direction
+Point l;             /// look direction
 
 
 int main(int argc, char **argv)
 {
     string command;
     ifstream scene;
-    scene.open(input_filepath);
+    scene.open(input_filepath + "scene.txt");
 
     if(!scene.is_open())
     {
@@ -44,16 +40,16 @@ int main(int argc, char **argv)
     scene>>fovY>>aspectRatio>>near>>far;
 
     // converting them to points
-    point eye(eye_x, eye_y, eye_z);
-    point look(look_x, look_y, look_z);
-    point up(up_x, up_y, up_z);
+    Point eye(eye_x, eye_y, eye_z);
+    Point look(look_x, look_y, look_z);
+    Point up(up_x, up_y, up_z);
 
     // finding l, r and u vectors
-    point l = look - eye;
+    Point l = look - eye;
     l.normalize();
-    point r = l ^ up;
+    Point r = l ^ up;
     r.normalize();
-    point u = r ^ l;
+    Point u = r ^ l;
 
     /// ---------- finding view transformation matrix ------------ ///
     TransformationMatrix T;
@@ -88,7 +84,7 @@ int main(int argc, char **argv)
         if(command == "triangle")
         {
             double point_x, point_y, point_z;
-            point points[3];
+            Point points[3];
 
             // input three points
             for(int i=0; i<3; i++)
@@ -168,6 +164,8 @@ int main(int argc, char **argv)
     stage1.close();
     stage2.close();
     stage3.close();
+
+    run_zBuffer_algorithm();
 
     return 0;
 }

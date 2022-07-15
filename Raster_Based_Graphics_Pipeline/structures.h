@@ -9,31 +9,31 @@ using namespace std;
 
 /// --------------- Declarations ---------------- ///
 
-class point;
+class Point;
 class TransformationMatrix;
 
-point TransformPoint(TransformationMatrix mat, point p);
-point RodriguesFormula(point axis, point vector_to_be_rotated, double angle);
+Point TransformPoint(TransformationMatrix mat, Point p);
+Point RodriguesFormula(Point axis, Point vector_to_be_rotated, double angle);
 double round(double var);
 
 
 /// --------------- Definitions ---------------- ///
 
-class point
+class Point
 {
 public:
     double x;
     double y;
     double z;
 
-    point()
+    Point()
     {
         x = 0;
         y = 0;
         z = 0;
     }
 
-    point(double a, double b, double c)
+    Point(double a, double b, double c)
     {
         x = a;
         y = b;
@@ -53,15 +53,15 @@ public:
     }
 
     void normalize();
-    point operator+(const point v);                 // vector sum
-    point operator-(const point v);                 // vector subtract
-    point operator*(const double a);                // vector scale
-    point operator^(const point v);                 // vector cross product
-    double operator*(const point a);                // vector dot product
+    Point operator+(const Point v);                 // vector sum
+    Point operator-(const Point v);                 // vector subtract
+    Point operator*(const double a);                // vector scale
+    Point operator^(const Point v);                 // vector cross product
+    double operator*(const Point a);                // vector dot product
 };
 
 // vector normalize
-void point::normalize()
+void Point::normalize()
 {
     double scale = sqrt(x*x + y*y + z*z);
 
@@ -71,9 +71,9 @@ void point::normalize()
 }
 
 // vector addition
-point point::operator+(const point v)
+Point Point::operator+(const Point v)
 {
-    point result;
+    Point result;
     result.x = x + v.x;
     result.y = y + v.y;
     result.z = z + v.z;
@@ -82,9 +82,9 @@ point point::operator+(const point v)
 }
 
 // vector subtraction
-point point::operator-(const point v)
+Point Point::operator-(const Point v)
 {
-    point result;
+    Point result;
     result.x = x - v.x;
     result.y = y - v.y;
     result.z = z - v.z;
@@ -93,9 +93,9 @@ point point::operator-(const point v)
 }
 
 // vector scale
-point point::operator*(const double a)
+Point Point::operator*(const double a)
 {
-    point result;
+    Point result;
     result.x = x * a;
     result.y = y * a;
     result.z = z * a;
@@ -104,15 +104,15 @@ point point::operator*(const double a)
 }
 
 // vector dot
-double point::operator*(const point a)
+double Point::operator*(const Point a)
 {
     return x * a.x + y * a.y + z * a.z;
 }
 
 // vector cross
-point point::operator^(const point v2)
+Point Point::operator^(const Point v2)
 {
-    point product;
+    Point product;
 
     product.x = y * v2.z - v2.y * z;
     product.y = v2.x * z - x * v2.z;
@@ -165,7 +165,7 @@ public:
         return result;
     }
 
-    void setMatrix(point a, point b, point c)
+    void setMatrix(Point a, Point b, Point c)
     {
         matrix[0][0] = a.x;
         matrix[0][1] = a.y;
@@ -219,16 +219,16 @@ public:
 
     void RotationMatrix(double angle, double ax, double ay, double az)
     {
-        point a(ax, ay, az);
-        point i(1, 0 ,0);
-        point j(0, 1, 0);
-        point k(0, 0, 1);
+        Point a(ax, ay, az);
+        Point i(1, 0 ,0);
+        Point j(0, 1, 0);
+        Point k(0, 0, 1);
 
         a.normalize();
 
-        point c1 = RodriguesFormula(i, a, angle);
-        point c2 = RodriguesFormula(j, a, angle);
-        point c3 = RodriguesFormula(k, a, angle);
+        Point c1 = RodriguesFormula(i, a, angle);
+        Point c2 = RodriguesFormula(j, a, angle);
+        Point c3 = RodriguesFormula(k, a, angle);
 
         // Rotation Matrix Generation
         matrix[0][0] = c1.x;
@@ -268,9 +268,9 @@ double round(double var)
 }
 
 
-point RodriguesFormula(point axis, point vector_to_be_rotated, double angle)
+Point RodriguesFormula(Point axis, Point vector_to_be_rotated, double angle)
 {
-    point result;
+    Point result;
 
     result = axis * round(cos(angle * pi/180)) + vector_to_be_rotated * ((1 - cos(angle * pi/180)) * (axis * vector_to_be_rotated)) + (vector_to_be_rotated ^ axis) * sin(angle * pi/180);
 
@@ -278,7 +278,7 @@ point RodriguesFormula(point axis, point vector_to_be_rotated, double angle)
 }
 
 
-point TransformPoint(TransformationMatrix mat, point p)
+Point TransformPoint(TransformationMatrix mat, Point p)
 {
     double point_matrix[DIM][1];
     double result_matrix[DIM][1];
@@ -302,5 +302,41 @@ point TransformPoint(TransformationMatrix mat, point p)
     }
 
     /// weight = result_matrix[3][0];
-    return (point(result_matrix[0][0], result_matrix[1][0], result_matrix[2][0]) * (1 / result_matrix[3][0]));   // balancing with weight
+    return (Point(result_matrix[0][0], result_matrix[1][0], result_matrix[2][0]) * (1 / result_matrix[3][0]));   // balancing with weight
 }
+
+
+// -------- for z_buffer ------------ //
+struct Color
+{
+    double red;
+    double green;
+    double blue;
+};
+
+
+class Triangle
+{
+public:
+    Point points[3];
+    Color color;
+
+    Triangle(Point point1, Point point2, Point point3)
+    {
+        points[0] = point1;
+        points[1] = point2;
+        points[2] = point3;
+
+        color.red = rand() % 256;
+        color.green = rand() % 256;
+        color.blue = rand() % 256;
+    }
+
+    void printTriangle()
+    {
+        cout<<points[0].x<<" "<<points[0].y<<" "<<points[0].z<<endl;
+        cout<<points[1].x<<" "<<points[1].y<<" "<<points[1].z<<endl;
+        cout<<points[2].x<<" "<<points[2].y<<" "<<points[2].z<<endl;
+        cout<<endl;
+    }
+};
