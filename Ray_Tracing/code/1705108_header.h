@@ -59,6 +59,13 @@ public:
             blue = 0;
     }
 
+    ~Color()
+    {
+        red = 0;
+        green = 0;
+        blue = 0;
+    }
+
     Color operator+(const Color c);                     // add two colors
     Color operator*(const double a);                    // multiply color by a scalar
     Color operator*(Color c);                           // multiply color by another color
@@ -204,6 +211,16 @@ public:
         this->Rd = direction;
         this->Rd.normalize();
     }
+
+    ~Ray()
+    {
+        Ro.x = 0;
+        Ro.y = 0;
+        Ro.z = 0;
+        Rd.x = 0;
+        Rd.y = 0;
+        Rd.z = 0;
+    }
 };
 
 
@@ -268,6 +285,97 @@ public:
             }
         }
     }
+
+    ~PointLight()
+    {
+        light_pos.x = 0;
+        light_pos.y = 0;
+        light_pos.z = 0;
+        color.red = 0;
+        color.green = 0;
+        color.blue = 0;
+    }
+};
+
+class SpotLight
+{
+    double radius;
+    int slices;
+    int stacks;
+
+public:
+    Vector3D light_pos;
+    Vector3D light_dir;
+    Color color;
+    double cutoff_angle;
+
+    SpotLight(Vector3D light_pos, Vector3D light_dir , double r, double g, double b, double cutoff_angle)
+    {
+        this->light_pos = light_pos;
+        this->light_dir = light_dir;
+        color.setColor(r, g, b);
+        this->cutoff_angle = cutoff_angle;
+        radius = 1;
+        slices = 12;
+        stacks = 4;
+    }
+    
+
+    void draw()
+    {
+        Vector3D points[stacks+1][slices+1];
+        int i,j;
+        double h,r;
+        //generate points
+        for(i=0;i<=stacks;i++)
+        {
+            h=radius*sin(((double)i/(double)stacks)*(pi/2));
+            r=radius*cos(((double)i/(double)stacks)*(pi/2));
+            for(j=0;j<=slices;j++)
+            {
+                points[i][j].x=r*cos(((double)j/(double)slices)*2*pi);
+                points[i][j].y=r*sin(((double)j/(double)slices)*2*pi);
+                points[i][j].z=h;
+            }
+        }
+
+        /* drawing quads using generated points */
+        glColor3f(color.red, color.green, color.blue);
+
+        for(int i=0; i<stacks; i++) {
+            for(int j=0; j<slices; j++) {
+                glBegin(GL_QUADS);
+                {
+                    /* upper hemisphere */
+                    glVertex3f(light_pos.x + points[i][j].x, light_pos.y + points[i][j].y, light_pos.z + points[i][j].z);
+                    glVertex3f(light_pos.x + points[i][j+1].x, light_pos.y + points[i][j+1].y, light_pos.z + points[i][j+1].z);
+                    glVertex3f(light_pos.x + points[i+1][j+1].x, light_pos.y + points[i+1][j+1].y, light_pos.z + points[i+1][j+1].z);
+                    glVertex3f(light_pos.x + points[i+1][j].x, light_pos.y + points[i+1][j].y, light_pos.z + points[i+1][j].z);
+
+                    /* lower hemisphere */
+                    glVertex3f(light_pos.x + points[i][j].x, light_pos.y + points[i][j].y, light_pos.z - points[i][j].z);
+                    glVertex3f(light_pos.x + points[i][j+1].x, light_pos.y + points[i][j+1].y, light_pos.z - points[i][j+1].z);
+                    glVertex3f(light_pos.x + points[i+1][j+1].x, light_pos.y + points[i+1][j+1].y, light_pos.z - points[i+1][j+1].z);
+                    glVertex3f(light_pos.x + points[i+1][j].x, light_pos.y + points[i+1][j].y, light_pos.z - points[i+1][j].z);
+                }
+                glEnd();
+            }
+        }
+    }
+
+    ~SpotLight()
+    {
+        light_pos.x = 0;
+        light_pos.y = 0;
+        light_pos.z = 0;
+        light_dir.x = 0;
+        light_dir.y = 0;
+        light_dir.z = 0;
+        color.red = 0;
+        color.green = 0;
+        color.blue = 0;
+        cutoff_angle = 0;
+    }
 };
 
 
@@ -312,11 +420,30 @@ public:
         coefficients[SPEC] = s;
         coefficients[REC_REFFLECTION] = r;
     }
+
+    ~Object()
+    {
+        reference_point.x = 0;
+        reference_point.y = 0;
+        reference_point.z = 0;
+        height = 0;
+        width = 0;
+        length = 0;
+        color.red = 0;
+        color.green = 0;
+        color.blue = 0;
+        coefficients[AMB] = 0;
+        coefficients[DIFF] = 0;
+        coefficients[SPEC] = 0;
+        coefficients[REC_REFFLECTION] = 0;
+        shine = 0;
+    }
 };
 
 int recursion_level = 0;
 Vector3D eye;
 vector<PointLight> point_lights;
+vector<SpotLight> spot_lights;
 vector<Object*> objects;
 
 
@@ -414,6 +541,7 @@ public:
         if(eye.euclideanDistance(reference_point) <= length)
             normal = normal * (-1);
 
+        // point lights
         for (int i = 0; i < point_lights.size(); i++)
         {
             Ray ray_1(point_lights[i].light_pos, intersectionPoint - point_lights[i].light_pos);        // incident ray from light
@@ -432,7 +560,8 @@ public:
                 }
             }
             Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
-            if(ray_1.Ro.euclideanDistance(shadowObstacle) < ray_1.Ro.euclideanDistance(intersectionPoint))
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
                 continue;
             
 
@@ -444,6 +573,46 @@ public:
 
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
+        }
+
+        // spot lights
+        for (int i = 0; i < spot_lights.size(); i++)
+        {
+            Ray ray_1(spot_lights[i].light_pos, intersectionPoint - spot_lights[i].light_pos);        // incident ray from light
+
+            Vector3D spotLightDir = spot_lights[i].light_dir;
+            spotLightDir.normalize();
+            
+            double theta = acos(spotLightDir * (ray_1.Rd*(-1))) * 180/pi;
+            if(theta > spot_lights[i].cutoff_angle)
+                continue;
+            
+            // if intersectionPoint is in shadow, the diffuse
+            // and specular components need not be calculated
+            double t, tMin2 = INF;
+
+            for(int i=0; i<objects.size(); i++)
+            {
+                Color dummy;
+                t = objects[i]->intersect(ray_1, dummy, 0);
+                if(t > 0 && t < tMin2)
+                {
+                    tMin2 = t;
+                }
+            }
+            Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
+                continue;       
+
+            // calculate lambertValue and phongValue
+            double lambertValue = max(0.0, normal * (ray_1.Rd*(-1)));
+
+            Ray ray_r(intersectionPoint, ray_1.Rd - (normal * (ray_1.Rd * normal))*2 );               // reflected light ray
+            double phongValue = pow(max(0.0, ray_r.Rd * (ray.Rd*(-1))), shine);
+
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
         }
 
         // ---------------------------------------------------- //
@@ -563,6 +732,7 @@ public:
         if(normal * (ray.Rd*(-1)) < 0)
             normal = normal * (-1);             // normal is pointing towards the viewer
 
+        // point lights
         for (int i = 0; i < point_lights.size(); i++)
         {
             Ray ray_1(point_lights[i].light_pos, intersectionPoint - point_lights[i].light_pos);        // incident ray from light
@@ -581,7 +751,8 @@ public:
                 }
             }
             Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
-            if(ray_1.Ro.euclideanDistance(shadowObstacle) < ray_1.Ro.euclideanDistance(intersectionPoint))
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
                 continue;
             
             
@@ -593,6 +764,46 @@ public:
 
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
+        }
+
+        // spot lights
+        for (int i = 0; i < spot_lights.size(); i++)
+        {
+            Ray ray_1(spot_lights[i].light_pos, intersectionPoint - spot_lights[i].light_pos);        // incident ray from light
+
+            Vector3D spotLightDir = spot_lights[i].light_dir;
+            spotLightDir.normalize();
+            
+            double theta = acos(spotLightDir * (ray_1.Rd*(-1))) * 180/pi;
+            if(theta > spot_lights[i].cutoff_angle)
+                continue;
+            
+            // if intersectionPoint is in shadow, the diffuse
+            // and specular components need not be calculated
+            double t, tMin2 = INF;
+
+            for(int i=0; i<objects.size(); i++)
+            {
+                Color dummy;
+                t = objects[i]->intersect(ray_1, dummy, 0);
+                if(t > 0 && t < tMin2)
+                {
+                    tMin2 = t;
+                }
+            }
+            Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
+                continue;          
+
+            // calculate lambertValue and phongValue
+            double lambertValue = max(0.0, normal * (ray_1.Rd*(-1)));
+
+            Ray ray_r(intersectionPoint, ray_1.Rd - (normal * (ray_1.Rd * normal))*2 );               // reflected light ray
+            double phongValue = pow(max(0.0, ray_r.Rd * (ray.Rd*(-1))), shine);
+
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
         }
 
         // ---------------- recursive reflection ---------------- //
@@ -756,6 +967,7 @@ public:
         if(normal * (ray.Rd * (-1)) < 0)
             normal = normal * (-1);
 
+        // point lights
         for (int i = 0; i < point_lights.size(); i++)
         {
             Ray ray_1(point_lights[i].light_pos, intersectionPoint - point_lights[i].light_pos);        // incident ray from light
@@ -774,7 +986,8 @@ public:
                 }
             }
             Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
-            if(ray_1.Ro.euclideanDistance(shadowObstacle) < ray_1.Ro.euclideanDistance(intersectionPoint))
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
                 continue;
             
             
@@ -786,6 +999,46 @@ public:
 
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
+        }
+
+        // spot lights
+        for (int i = 0; i < spot_lights.size(); i++)
+        {
+            Ray ray_1(spot_lights[i].light_pos, intersectionPoint - spot_lights[i].light_pos);        // incident ray from light
+
+            Vector3D spotLightDir = spot_lights[i].light_dir;
+            spotLightDir.normalize();
+            
+            double theta = acos(spotLightDir * (ray_1.Rd*(-1))) * 180/pi;
+            if(theta > spot_lights[i].cutoff_angle)
+                continue;
+            
+            // if intersectionPoint is in shadow, the diffuse
+            // and specular components need not be calculated
+            double t, tMin2 = INF;
+
+            for(int i=0; i<objects.size(); i++)
+            {
+                Color dummy;
+                t = objects[i]->intersect(ray_1, dummy, 0);
+                if(t > 0 && t < tMin2)
+                {
+                    tMin2 = t;
+                }
+            }
+            Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
+                continue;           
+
+            // calculate lambertValue and phongValue
+            double lambertValue = max(0.0, normal * (ray_1.Rd*(-1)));
+
+            Ray ray_r(intersectionPoint, ray_1.Rd - (normal * (ray_1.Rd * normal))*2 );               // reflected light ray
+            double phongValue = pow(max(0.0, ray_r.Rd * (ray.Rd*(-1))), shine);
+
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
         }
 
         // ---------------------------------------------------- //
@@ -919,6 +1172,7 @@ class Floor: public Object
         // calculating ambient component
         colorContainer = intersectionPointColor * coefficients[AMB];
 
+        // point lights
         for (int i = 0; i < point_lights.size(); i++)
         {
             Ray ray_1(point_lights[i].light_pos, intersectionPoint - point_lights[i].light_pos);        // incident ray from light
@@ -937,8 +1191,8 @@ class Floor: public Object
                 }
             }
             Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
-
-            if(ray_1.Ro.euclideanDistance(shadowObstacle) < ray_1.Ro.euclideanDistance(intersectionPoint))
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
                 continue;
             
             
@@ -950,6 +1204,46 @@ class Floor: public Object
 
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
             colorContainer = colorContainer + (point_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
+        }
+
+        // spot lights
+        for (int i = 0; i < spot_lights.size(); i++)
+        {
+            Ray ray_1(spot_lights[i].light_pos, intersectionPoint - spot_lights[i].light_pos);        // incident ray from light
+
+            Vector3D spotLightDir = spot_lights[i].light_dir;
+            spotLightDir.normalize();
+            
+            double theta = acos(spotLightDir * (ray_1.Rd*(-1))) * 180/pi;
+            if(theta > spot_lights[i].cutoff_angle)
+                continue;
+            
+            // if intersectionPoint is in shadow, the diffuse
+            // and specular components need not be calculated
+            double t, tMin2 = INF;
+
+            for(int i=0; i<objects.size(); i++)
+            {
+                Color dummy;
+                t = objects[i]->intersect(ray_1, dummy, 0);
+                if(t > 0 && t < tMin2)
+                {
+                    tMin2 = t;
+                }
+            }
+            Vector3D shadowObstacle = ray_1.Ro + ray_1.Rd * tMin2;
+            double epsilon = 0.0000001;  
+            if(ray_1.Ro.euclideanDistance(shadowObstacle) < (ray_1.Ro.euclideanDistance(intersectionPoint) - epsilon))
+                continue;           
+
+            // calculate lambertValue and phongValue
+            double lambertValue = max(0.0, normal * (ray_1.Rd*(-1)));
+
+            Ray ray_r(intersectionPoint, ray_1.Rd - (normal * (ray_1.Rd * normal))*2 );               // reflected light ray
+            double phongValue = pow(max(0.0, ray_r.Rd * (ray.Rd*(-1))), shine);
+
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[DIFF] * lambertValue)) * intersectionPointColor;
+            colorContainer = colorContainer + (spot_lights[i].color * (coefficients[SPEC] * phongValue)) * intersectionPointColor;
         }
 
         // ---------------- recursive reflection ---------------- //

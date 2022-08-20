@@ -3,8 +3,9 @@
 #include <math.h>
 #include <iostream>
 #include <vector>
-#include "1705108_classes.h"
-#include "bitmap_image.hpp"
+#include "1705108_header.h"
+#include "1705108_bitmap_image.hpp"
+#include "1705108_config.h"
 
 #define pi (2*acos(0.0))
 #define ANGLE_OF_ROTATION 3.0       // in degrees
@@ -33,6 +34,7 @@ int bmp_image_count = 0;
 
 extern vector<Object*> objects;
 extern vector<PointLight> point_lights;
+extern vector<SpotLight> spot_lights;
 
 extern Vector3D eye;            /// position of the camera
 Vector3D u;                     /// up direction
@@ -117,7 +119,7 @@ void capture()
             }
         }
     }
-    img.save_image("E:\\4-1\\CSE_410 Computer Graphics Sessional\\Offline_3\\Ray_Tracing\\output\\" + to_string(++bmp_image_count) + ".bmp");
+    img.save_image(output_filepath + to_string(++bmp_image_count) + ".bmp");
     cout<<"Image "<<bmp_image_count<<" captured"<<endl;
 }
 
@@ -257,6 +259,10 @@ void display(){
         point_lights[i].draw();
     }
 
+    for(int i=0; i<spot_lights.size(); i++){
+        spot_lights[i].draw();
+    }
+
 	//ADD this line in the end --- if you use double buffer (i.e. GL_DOUBLE)
 	glutSwapBuffers();
 }
@@ -313,9 +319,8 @@ void init(){
 
 void loadData()
 {
-    string filepath = "E:\\4-1\\CSE_410 Computer Graphics Sessional\\Offline_3\\Ray_Tracing\\scene.txt";
     ifstream sceneFile;
-    sceneFile.open(filepath);
+    sceneFile.open(input_filepath);
 
     if(!sceneFile.is_open())
     {
@@ -422,6 +427,26 @@ void loadData()
         point_lights.push_back(PointLight(light_pos, light_color_r, light_color_g, light_color_b));
     }
 
+    sceneFile >> spot_light_count;
+    double spot_light_x, spot_light_y, spot_light_z;
+    double spot_light_dir_x, spot_light_dir_y, spot_light_dir_z;
+    double spot_light_color_r, spot_light_color_g, spot_light_color_b;
+    double spot_light_angle;
+
+    for(int i=0; i<spot_light_count; i++)
+    {
+        sceneFile >> spot_light_x >> spot_light_y >> spot_light_z;
+        sceneFile >> spot_light_color_r >> spot_light_color_g >> spot_light_color_b;
+        sceneFile >> spot_light_dir_x >> spot_light_dir_y >> spot_light_dir_z;
+        sceneFile >> spot_light_angle;
+
+        Vector3D spot_light_pos(spot_light_x, spot_light_y, spot_light_z);
+        Vector3D spot_light_dir(spot_light_dir_x, spot_light_dir_y, spot_light_dir_z);
+
+        spot_lights.push_back(SpotLight(spot_light_pos, spot_light_dir, spot_light_color_r, spot_light_color_g, spot_light_color_b, spot_light_angle));
+    }
+
+
     sceneFile.close();
 
     // creating floor
@@ -431,23 +456,24 @@ void loadData()
     objects.push_back(obj);
 }
 
-// void printVectors()
-// {
-//     cout<<"Object Vector"<<endl;
-//     for(int i=0; i<objects.size(); i++)
-//     {
-//         cout<<objects[i]->reference_point.x<<" "<<objects[i]->reference_point.y<<" "<<objects[i]->reference_point.z<<endl;
-//         cout<<objects[i]->coefficients[0]<<" "<<objects[i]->coefficients[1]<<" "<<objects[i]->coefficients[2]<<" "<<objects[i]->coefficients[3]<<endl;
-//         cout<<objects[i]->color.red<<" "<<objects[i]->color.green<<" "<<objects[i]->color.blue<<endl;
-//         cout<<endl;
-//     }
-//     cout<<"Point Light Vector"<<endl;
-//     for(int i=0; i<point_lights.size(); i++)
-//     {
-//         cout<<point_lights[i].position.x<<" "<<point_lights[i].position.y<<" "<<point_lights[i].position.z<<endl;
-//         cout<<endl;
-//     }
-// }
+void clearObjects()
+{
+    for(int i=0; i<objects.size(); i++)
+    {
+        delete objects[i];
+    }
+    objects.clear();
+}
+
+void clearPointLights()
+{
+    point_lights.clear();
+}
+
+void clearSpotLights()
+{
+    spot_lights.clear();
+}
 
 
 /// ------------------------- main function --------------------- ///
@@ -470,6 +496,12 @@ int main(int argc, char **argv){
 	glutKeyboardFunc(keyboardListener);
 	glutSpecialFunc(specialKeyListener);
 	glutMouseFunc(mouseListener);
+
+    if((atexit(clearObjects) != 0) || (atexit(clearPointLights) != 0) || (atexit(clearSpotLights) != 0))
+    {
+        cout<<"Error: Could not register exit function"<<endl;
+        exit(1);
+    }
 
     loadData();
 
